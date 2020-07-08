@@ -2,6 +2,8 @@
 #define GRIDWITHWEIGHTS_HPP
 
 #include "../SquareGrid/SquareGrid.hpp"
+#include <ros/ros.h>
+#include <nav_msgs/OccupancyGrid.h>
 
 struct GridWithWeights: SquareGrid {
   std::unordered_set<Pos> forests;
@@ -22,6 +24,7 @@ inline void draw_grid(const GridWithWeights& grid, int field_width,
                std::unordered_map<Pos, double>* distances=nullptr,
                std::unordered_map<Pos, Pos>* point_to=nullptr,
                std::vector<Pos>* path=nullptr) {
+  std::cout<<"\n grid: "<<grid.width<<", "<<grid.height;
   for (int y = grid.height; y != 0; --y) {
     for (int x = 0; x != grid.width; ++x) {
       Pos id {x, y};
@@ -51,6 +54,69 @@ inline void draw_grid(const GridWithWeights& grid, int field_width,
     }
     std::cout << '\n';
   }
+}
+
+inline void publish_grid(const ros::Publisher& grid_pub, const GridWithWeights& grid, int field_width,  geometry_msgs::Pose currentPos,
+               std::unordered_map<Pos, double>* distances=nullptr,
+               std::unordered_map<Pos, Pos>* point_to=nullptr,
+               std::vector<Pos>* path=nullptr) 
+               
+{
+  
+  nav_msgs::OccupancyGrid* mymap = new nav_msgs::OccupancyGrid();
+  
+  mymap->header.frame_id="world";
+	mymap->header.stamp = ros::Time::now();
+  mymap->info.width = grid.width;
+	mymap->info.height = grid.height;
+  mymap->info.resolution = 0.2;
+  // mymap->info.resolution = grid.resolution;
+	mymap->info.origin.position.x = currentPos.position.x-mymap->info.resolution*grid.width/2.0;
+	mymap->info.origin.position.y = currentPos.position.y-mymap->info.resolution*grid.height/2.0;
+	mymap->info.origin.position.z = 0;
+	mymap->info.origin.orientation.x = 0;
+	mymap->info.origin.orientation.y = 0;
+	mymap->info.origin.orientation.z = 0;
+	mymap->info.origin.orientation.w = 1;
+  
+  mymap->data.resize(mymap->info.width * mymap->info.height);
+  for (int i = 0; i < mymap->data.size(); i++)
+    mymap->data[i]=0;
+  
+  for (int y = 0; y < grid.height; ++y) {
+    for (int x = 0; x < grid.width; ++x) {
+      Pos id {x, y};
+      // std::cerr << std::left << std::setw(field_width);
+      if (grid.walls.find(id) != grid.walls.end()) 
+      {
+        //  std::cerr << std::string(field_width, '#');//virtual barrier
+        mymap->data[x+y*grid.width] = 255;
+      } 
+      // else if (point_to != nullptr && point_to->count(id)) 
+      // {
+      //   Pos next = (*point_to)[id];
+      //   if (next.x == x + 1) { std::cout << "> "; }
+      //   else if (next.x == x - 1) { std::cout << "< "; }
+      //   else if (next.y == y + 1) { std::cout << "v "; }
+      //   else if (next.y == y - 1) { std::cout << "^ "; }
+      //   else { std::cout << "* "; }
+      // } else if (distances != nullptr && distances->count(id)) {
+      //   std::cout << (*distances)[id];
+      // } else if (grid.forests.find(id) != grid.forests.end()) {
+      //     if (path != nullptr && find(path->begin(), path->end(), id) != path->end()) {
+      //       std::cout << std::string(field_width, '&');
+      //     } else {
+      //       std::cout << std::string(field_width, '%');// valor cost_map
+      //     }
+      // } else if (path != nullptr && find(path->begin(), path->end(), id) != path->end()){
+      //   std::cout << '@';//trajetória
+      // } else {// limpo
+      //   std::cout << '.';
+      // }
+    }
+  }
+  grid_pub.publish(*mymap);
+  delete mymap;
 }
 
 // // This outputs a grid. Pass in a distances map if you want to print

@@ -147,6 +147,7 @@ namespace rra_local_planner {
     pid_I_angular_  = 0;
 
     distance_pub_ = private_nh.advertise<std_msgs::Float64>("distance", 1);
+    grid_pub_ = private_nh.advertise<nav_msgs::OccupancyGrid>("grid", 1);
     tcpa_pub_ = private_nh.advertise<std_msgs::Float64>("t_cpa", 1);
     dcpa_pub_ = private_nh.advertise<std_msgs::Float64>("d_cpa", 1);
 
@@ -401,8 +402,8 @@ namespace rra_local_planner {
       tf::Stamped<tf::Pose>& drive_velocities) 
   {
 
-    global_vel_.position.x = global_vel.getOrigin().getX();
-    global_vel_.position.y = global_vel.getOrigin().getY();
+    // global_vel_.position.x = global_vel.getOrigin().getX();
+    // global_vel_.position.y = global_vel.getOrigin().getY();
 
     global_pose_.position.x = global_pose.getOrigin().getX();
     global_pose_.position.y = global_pose.getOrigin().getY();
@@ -514,7 +515,7 @@ namespace rra_local_planner {
     // std::cout << "Finished conversion" << std::endl;
     // ROS_INFO("Costmap size: %d x %d", planner_util_->getCostmap()->getSizeInCellsX(), planner_util_->getCostmap()->getSizeInCellsY());
     // ROS_INFO("Costmap resolution: %f ", planner_util_->getCostmap()->getResolution());
-
+    
     //-----------------------------* creates artificial terrain cost
     // Artificial Terrain Cost for COLREGS-COMPLIANCE if is there any other vessel near
     bool weHaveCompany = false;
@@ -545,21 +546,21 @@ namespace rra_local_planner {
 
         // ROS_INFO("ori: %f", ori);
 
-        if (ori >= -45 && ori < 45)
+         if (ori >= -45 && ori < 45)
         {
-          sector = 1;
+          sector = 4;
         }
         else if (ori >= 45 && ori < 135)
         {
-          sector = 2;
+          sector = 1;
         }
         else if ((ori >= 135 && ori < 180) || (ori >= -180 && ori < -135))
         {
-          sector = 3;
+          sector = 2;
         }
         else if (ori >= -135 && ori < -45)
         {
-          sector = 4;
+          sector = 3;
         }
 
         first_sector_detected_ = sector;
@@ -626,8 +627,9 @@ namespace rra_local_planner {
 
     // std::cout << "Drawing cenario" << std::endl;
     // draw_grid(*graph, 2, nullptr, nullptr, &local_path_at_local_frame);
-    // std::cout << "Finished drawing" << std::endl;
-
+    // std::cout << "Finished drawing" << std::endl;     
+    publish_grid(grid_pub_, *graph, 2, global_pose_, nullptr, nullptr, &local_path_at_local_frame);
+     
     // std::cout << "Converting local plan from local coordinations to global cordenates" << std::endl;
     for (auto pos = local_path_at_local_frame.begin(); pos != local_path_at_local_frame.end(); pos++)
     {
@@ -666,10 +668,15 @@ namespace rra_local_planner {
                                   global_pose.getOrigin().getX(), 
                                   global_pose.getOrigin().getY() 
                                 ) - tf::getYaw(global_pose.getRotation());
-
+    if (ang > M_PI)
+      ang -= 2*M_PI;
+    if (ang < (-1)*M_PI)
+      ang += 2*M_PI;
+      
     tf::Vector3 start(0, 0, 0);  
-    if (fabs(ang) <= STEERING_ANGLE*M_PI/180 )
+    if (fabs(ang) <= STEERING_ANGLE*M_PI/180.0 )
     {
+      // SMALL ANGLES
           start = tf::Vector3(
                       linear_vel(
                                   local_path_at_global_frame[local_path_index_to_follow].x, 
@@ -685,25 +692,30 @@ namespace rra_local_planner {
       
     }else if ( last_astar_goal_.x != -1 && last_astar_goal_.y != -1 )
     {
-
-      drive_velocities.setOrigin(last_drive_velocities_.getOrigin());
-
-    }else{ drive_velocities.setOrigin(start); }
+      // 
+      //std::cerr<<"\n velocity: "<<last_drive_velocities_.getOrigin().getX()<<", "<<last_drive_velocities_.getOrigin().getY()<<", "<<last_drive_velocities_.getOrigin().getZ()<<") ";
+      //drive_velocities.setOrigin(last_drive_velocities_.getOrigin());
+      drive_velocities.setOrigin(tf::Vector3(0.6,0,0));
+    }
+    else
+    { 
+      drive_velocities.setOrigin(start); 
+    }
     
     // drive_velocities.setOrigin(start);    
     // drive_velocities.setOrigin(last_drive_velocities_.getOrigin());        
 
     tf::Matrix3x3 matrix;
-    matrix.setRotation(
-                        tf::createQuaternionFromYaw(
-                                                    angular_vel(local_path_at_global_frame[local_path_index_to_follow].x, 
+    double angle_speed =angular_vel(local_path_at_global_frame[local_path_index_to_follow].x, 
                                                     local_path_at_global_frame[local_path_index_to_follow].y, global_pose.getOrigin().getX(), 
                                                     global_pose.getOrigin().getY(), 
                                                     tf::getYaw(global_pose.getRotation()), 
-                                                    PID_Kp_ANGULAR)
-                                                    )
+                                                    PID_Kp_ANGULAR);
+    matrix.setRotation(
+                        tf::createQuaternionFromYaw( angle_speed )
                       );
     drive_velocities.setBasis(matrix);
+
 
     last_astar_goal_.x = astar_local_goal_global_frame.x;
     last_astar_goal_.y = astar_local_goal_global_frame.y;
@@ -720,7 +732,7 @@ namespace rra_local_planner {
   // As outlined in Section 4.1.1, a simple heading proportional
   // controller based on Bertaska2015Experimental and Go to Goal ROS move_base tutorial
   double RRAPlanner::linear_vel(double goal_x, double goal_y, double self_x, double self_y, double constt){
-    return constt * euclidian_distance(goal_x, goal_y, self_x, self_y);
+     return constt * euclidian_distance(goal_x, goal_y, self_x, self_y);
 
     // double err = euclidian_distance(goal_x, goal_y, self_x, self_y);
     // double P = PID_Kp_LINEAR * err;
@@ -731,7 +743,13 @@ namespace rra_local_planner {
   }
 
   double RRAPlanner::angular_vel(double goal_x, double goal_y, double self_x, double self_y, double self_th, double constt){
-    return constt * (steering_angle(goal_x, goal_y, self_x, self_y) - self_th);
+    double error =  steering_angle(goal_x, goal_y, self_x, self_y) - self_th;
+    if (error > M_PI)
+      error -= 2*M_PI;
+    if (error < (-1)*M_PI)
+      error += 2*M_PI;
+
+    return constt * error;
 
     // double err = steering_angle(goal_x, goal_y, self_x, self_y) - self_th;
     // double P = PID_Kp_ANGULAR * err;
@@ -825,7 +843,7 @@ namespace rra_local_planner {
     //// creates obstacle based on ori
 
     short int width, length, x_offset;
-
+    
     switch (risk)
     {
     case HeadOn:
@@ -1066,8 +1084,8 @@ namespace rra_local_planner {
     case Overtaking:
       switch (sector)
       {
-      case 1:
-        // ROS_INFO("Overtaking S1");
+      case 4:
+        // ROS_INFO("Overtaking S4");
         // Hardcoded ajustments
         width     = ARTIFICIAL_TERRAIN_COST_WIDTH/2;
         length    = ARTIFICIAL_TERRAIN_COST_LENGTH +2;
@@ -1090,8 +1108,8 @@ namespace rra_local_planner {
         }
         break;
       
-      case 2:
-        // ROS_INFO("Overtaking S2");
+      case 1:
+        // ROS_INFO("Overtaking S1");
         // Hardcoded ajustments
         width     = ARTIFICIAL_TERRAIN_COST_WIDTH/2;
         length    = ARTIFICIAL_TERRAIN_COST_LENGTH +2;
@@ -1114,8 +1132,8 @@ namespace rra_local_planner {
         }
         break;
       
-      case 3:
-        // ROS_INFO("Overtaking S3");
+      case 2:
+        // ROS_INFO("Overtaking S2");
         // Hardcoded ajustments
         width     = ARTIFICIAL_TERRAIN_COST_WIDTH/2;
         length    = ARTIFICIAL_TERRAIN_COST_LENGTH +2;
@@ -1138,8 +1156,8 @@ namespace rra_local_planner {
         }
         break;
       
-      case 4:
-        // ROS_INFO("Overtaking S4");
+      case 3:
+        // ROS_INFO("Overtaking S3");
         // Hardcoded ajustments
         width     = ARTIFICIAL_TERRAIN_COST_WIDTH/2;
         length    = ARTIFICIAL_TERRAIN_COST_LENGTH +2;
@@ -1172,7 +1190,7 @@ namespace rra_local_planner {
       // ROS_INFO("NO RISK");
       break;
     }
-
+        
     // // Hardcoded ajustments
     // width     = ARTIFICIAL_TERRAIN_COST_WIDTH/2;
     // length    = ARTIFICIAL_TERRAIN_COST_LENGTH +2;

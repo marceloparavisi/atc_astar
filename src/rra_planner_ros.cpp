@@ -155,9 +155,16 @@ namespace rra_local_planner {
     }
 
     if(latchedStopRotateController_.isGoalReached(&planner_util_, odom_helper_, current_pose_)) {
-      ROS_INFO("Goal reached");
+      ROS_INFO("-------------------------Goal reached ");
       return true;
     } else {
+        tf::Stamped<tf::Pose> goal_pose;
+        planner_util_.getGoal(goal_pose);
+        double goal_th = tf::getYaw(goal_pose.getRotation());
+        base_local_planner::LocalPlannerLimits limits = planner_util_.getCurrentLimits();
+        double angle = base_local_planner::getGoalOrientationAngleDifference(current_pose_, goal_th);
+        std::cerr<<"\n CHECKED BY "<<fabs(angle)<<" <= "<<limits.yaw_goal_tolerance;
+      ROS_INFO("Goal not reached");
       return false;
     }
   }
@@ -338,6 +345,7 @@ namespace rra_local_planner {
     // update plan in rra_planner even if we just stop and rotate, to allow checkTrajectory
     dp_->updatePlanAndLocalCosts(current_pose_, transformed_plan, costmap_ros_->getRobotFootprint());
 
+    
     if (latchedStopRotateController_.isPositionReached(&planner_util_, current_pose_)) {
       //publish an empty plan because we've reached our goal position
       std::vector<geometry_msgs::PoseStamped> local_plan;

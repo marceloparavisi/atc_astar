@@ -64,6 +64,7 @@
 #include <nav_msgs/Odometry.h>
 
 #include <std_msgs/Float64.h>
+#include <nav_msgs/OccupancyGrid.h>
 
 #include "../../include/AStar/Astar.h"
 // #include "../AStar/Astar.h"
@@ -72,11 +73,10 @@
 // #define Kp 0.1
 // #define Ki 0
 
-// #define PID_Kp_LINEAR                   0.075   // Proportional controller gain
-#define PID_Kp_LINEAR                   0.1   // Proportional controller gain
+#define PID_Kp_LINEAR                   0.3   // Proportional controller gain
 #define PID_Kp_ANGULAR                  0.75   // Proportional controller gain
 
-#define PID_Ki_LINEAR                   0.0   // Proportional controller gain
+#define PID_Ki_LINEAR                   0.001   // Proportional controller gain
 #define PID_Ki_ANGULAR                  0.0   // Proportional controller gain
 
 #define COSTMAP_FREE_ACCEPTANCE         1     // value from 0 to 255
@@ -84,9 +84,9 @@
 #define POSE_TO_FOLLOW                  15    // 
 // #define LOCAL_PATH_MIN_SIZE           00030
 #define ARTIFICIAL_TERRAIN_COST_LENGTH  80    // Local costmap units
-#define ARTIFICIAL_TERRAIN_COST_WIDTH   6     // Local costmap units
-#define CRITICAL_DISTANCE               5
-#define STEERING_ANGLE                  90    // minimun steering_ange error before increase x linear velocity
+#define ARTIFICIAL_TERRAIN_COST_WIDTH   20     // Local costmap units
+#define CRITICAL_DISTANCE               2
+#define STEERING_ANGLE                  30    // minimun steering_ange error before increase x linear velocity
 
 enum colregs_encounter_type
 {
@@ -257,6 +257,7 @@ namespace rra_local_planner {
 
       // for performance evaluation
       ros::Publisher distance_pub_;
+      ros::Publisher grid_pub_;
       ros::Publisher tcpa_pub_;
       ros::Publisher dcpa_pub_;
 
