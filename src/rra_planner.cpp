@@ -402,8 +402,8 @@ namespace rra_local_planner {
       tf::Stamped<tf::Pose>& drive_velocities) 
   {
 
-    // global_vel_.position.x = global_vel.getOrigin().getX();
-    // global_vel_.position.y = global_vel.getOrigin().getY();
+    global_vel_.position.x = global_vel.getOrigin().getX();
+    global_vel_.position.y = global_vel.getOrigin().getY();
 
     global_pose_.position.x = global_pose.getOrigin().getX();
     global_pose_.position.y = global_pose.getOrigin().getY();
